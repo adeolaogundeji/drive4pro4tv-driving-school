@@ -1,38 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Award, CalendarDays, CarFront, Check, Clock3, Gauge, LogOut, Menu, Route, ShieldCheck, Sparkles, UserRound, X } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Award, CarFront, Gauge, Menu, Route, ShieldCheck, UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-
-type WebMcpContext = {
-  registerTool: (
-    tool: {
-      name: string;
-      title: string;
-      description: string;
-      inputSchema: Record<string, unknown>;
-      annotations: { readOnlyHint: boolean; untrustedContentHint: boolean };
-      execute: () => unknown;
-    },
-    options: { signal: AbortSignal },
-  ) => void | Promise<void>;
-};
-
-declare global {
-  interface Document {
-    readonly modelContext?: WebMcpContext;
-  }
-}
-
-type Shift = { day: string; date: string; inTime: string; outTime: string; hours: number };
-
-const initialShifts: Shift[] = [
-  { day: "Mon", date: "Sep 21", inTime: "8:02 AM", outTime: "4:18 PM", hours: 8.27 },
-  { day: "Tue", date: "Sep 22", inTime: "7:56 AM", outTime: "3:44 PM", hours: 7.8 },
-  { day: "Wed", date: "Sep 23", inTime: "8:11 AM", outTime: "4:06 PM", hours: 7.92 },
-  { day: "Thu", date: "Sep 24", inTime: "8:04 AM", outTime: "3:29 PM", hours: 7.42 },
-];
+import { EmployeePortal } from "@/components/employee-portal";
 
 const programs = [
   { number: "01", title: "First-time drivers", copy: "A calm, structured path from first lesson to confident everyday driving.", icon: CarFront },
@@ -42,22 +13,7 @@ const programs = [
 
 export default function Home() {
   const [employeeView, setEmployeeView] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [employeeId, setEmployeeId] = useState("");
-  const [pin, setPin] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [clockedInAt, setClockedInAt] = useState<Date | null>(null);
-  const [shifts, setShifts] = useState(initialShifts);
-  const [now, setNow] = useState(new Date());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const totalHours = useMemo(() => shifts.reduce((sum, shift) => sum + shift.hours, 0), [shifts]);
-  const liveHours = clockedInAt ? Math.max(0, (now.getTime() - clockedInAt.getTime()) / 3_600_000) : 0;
 
   function enterPortal() {
     setEmployeeView(true);
@@ -65,77 +21,8 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function handleLogin(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (employeeId.trim().toUpperCase() === "EMP-104" && pin === "2468") {
-      setLoggedIn(true);
-      setLoginError("");
-      return;
-    }
-    setLoginError("That employee ID or PIN does not match the demo account.");
-  }
-
-  function clockOut() {
-    if (!clockedInAt) return;
-    const endedAt = new Date();
-    const hours = Math.max(0.01, (endedAt.getTime() - clockedInAt.getTime()) / 3_600_000);
-    setShifts((current) => [...current, {
-      day: endedAt.toLocaleDateString("en-US", { weekday: "short" }),
-      date: endedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      inTime: clockedInAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-      outTime: endedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-      hours,
-    }]);
-    setClockedInAt(null);
-  }
-
-  useEffect(() => {
-    const context = document.modelContext;
-    if (!context?.registerTool) return;
-    const lifecycle = new AbortController();
-    const options = { signal: lifecycle.signal };
-    const schema = { type: "object", properties: {}, additionalProperties: false };
-    const tools = [
-      context.registerTool({
-        name: "clock_in",
-        title: "Clock in",
-        description: "Start the employee's active shift in the visible timekeeping workspace.",
-        inputSchema: schema,
-        annotations: { readOnlyHint: false, untrustedContentHint: false },
-        execute: () => {
-          if (clockedInAt) return { status: "already_clocked_in" };
-          const startedAt = new Date();
-          setClockedInAt(startedAt);
-          return { status: "clocked_in", startedAt: startedAt.toISOString() };
-        },
-      }, options),
-      context.registerTool({
-        name: "clock_out",
-        title: "Clock out",
-        description: "End the employee's active shift and add it to the visible weekly timesheet.",
-        inputSchema: schema,
-        annotations: { readOnlyHint: false, untrustedContentHint: false },
-        execute: () => {
-          if (!clockedInAt) return { status: "not_clocked_in" };
-          clockOut();
-          return { status: "clocked_out" };
-        },
-      }, options),
-      context.registerTool({
-        name: "get_weekly_timesheet",
-        title: "Get weekly timesheet",
-        description: "Read this employee's visible shifts and calculated weekly total.",
-        inputSchema: schema,
-        annotations: { readOnlyHint: true, untrustedContentHint: false },
-        execute: () => ({ shifts, totalHours: Number(totalHours.toFixed(2)), clockedIn: Boolean(clockedInAt) }),
-      }, options),
-    ];
-    void Promise.allSettled(tools.map((tool) => Promise.resolve(tool)));
-    return () => lifecycle.abort();
-  }, [clockedInAt, shifts, totalHours]);
-
   if (employeeView) {
-    return <EmployeePortal loggedIn={loggedIn} employeeId={employeeId} pin={pin} loginError={loginError} shifts={shifts} totalHours={totalHours} clockedInAt={clockedInAt} liveHours={liveHours} now={now} onEmployeeId={setEmployeeId} onPin={setPin} onLogin={handleLogin} onClockIn={() => setClockedInAt(new Date())} onClockOut={clockOut} onExit={() => { setEmployeeView(false); setLoggedIn(false); setEmployeeId(""); setPin(""); setLoginError(""); }} />;
+    return <EmployeePortal onExit={() => setEmployeeView(false)} />;
   }
 
   return (
@@ -188,113 +75,4 @@ export default function Home() {
       <footer className="bg-[#0b0b0c] py-10 text-white"><div className="mx-auto flex max-w-[1440px] flex-col gap-5 px-5 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-14"><div><p className="text-xl font-black italic">Drive<span className="text-[#ec1c24]">4</span>Pro<span className="text-[#ec1c24]">4TV</span></p><p className="mt-1 text-xs uppercase tracking-[0.25em] text-white/45">Excellence in perfection</p></div><button onClick={enterPortal} className="flex items-center gap-2 self-start text-sm font-semibold text-white/65 transition hover:text-white md:self-auto"><UserRound className="size-4" /> Employee access</button></div></footer>
     </main>
   );
-}
-
-type PortalProps = {
-  loggedIn: boolean; employeeId: string; pin: string; loginError: string; shifts: Shift[]; totalHours: number; clockedInAt: Date | null; liveHours: number; now: Date;
-  onEmployeeId: (value: string) => void; onPin: (value: string) => void; onLogin: (event: React.FormEvent<HTMLFormElement>) => void; onClockIn: () => void; onClockOut: () => void; onExit: () => void;
-};
-
-function EmployeePortal(props: PortalProps) {
-  if (!props.loggedIn) {
-    return <main className="portal-shell min-h-screen"><div className="mx-auto flex min-h-screen max-w-[1440px] flex-col px-5 py-6 sm:px-8 lg:px-14"><button onClick={props.onExit} className="flex items-center gap-2 self-start text-sm font-bold text-white/70 transition hover:text-white"><ArrowLeft className="size-4" /> Back to public site</button><div className="grid flex-1 items-center gap-12 py-14 lg:grid-cols-2"><div className="max-w-xl text-white"><div className="mb-8 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-[#ec1c24] font-black italic">4</span><span className="font-black italic">Drive4Pro4TV <span className="font-medium not-italic text-white/45">Staff</span></span></div><p className="section-kicker text-[#ff4b51]">Employee portal</p><h1 className="mt-4 text-[clamp(3.2rem,7vw,6.8rem)] font-black leading-[.9] tracking-[-0.06em]">Your week,<br />at a glance.</h1><p className="mt-6 max-w-lg text-lg leading-8 text-white/55">Clock in, clock out, and review your weekly hours from one simple workspace.</p></div><form onSubmit={props.onLogin} className="w-full max-w-md justify-self-center rounded-[2rem] bg-white p-7 shadow-2xl sm:p-9"><div className="grid size-12 place-items-center rounded-2xl bg-[#fff0f0] text-[#ec1c24]"><UserRound className="size-6" /></div><h2 className="mt-6 text-3xl font-black tracking-tight">Welcome back</h2><p className="mt-2 text-zinc-500">Enter your employee credentials to continue.</p><label className="mt-7 block text-sm font-bold" htmlFor="employee-id">Employee ID</label><Input id="employee-id" value={props.employeeId} onChange={(event) => props.onEmployeeId(event.target.value)} placeholder="EMP-104" className="mt-2 h-12 rounded-xl" autoComplete="username" /><label className="mt-5 block text-sm font-bold" htmlFor="employee-pin">4-digit PIN</label><Input id="employee-pin" value={props.pin} onChange={(event) => props.onPin(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="••••" type="password" inputMode="numeric" className="mt-2 h-12 rounded-xl" autoComplete="current-password" />{props.loginError && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">{props.loginError}</p>}<Button type="submit" className="mt-6 h-12 w-full rounded-xl bg-[#ec1c24] font-bold text-white hover:bg-[#c81118]">Sign in <ArrowRight className="ml-1 size-4" /></Button><div className="mt-5 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-500"><span className="font-bold text-zinc-700">Demo access:</span> EMP-104 · PIN 2468</div></form></div></div></main>;
-  }
-
-  const weeklyGoal = 40;
-  const displayedTotal = props.totalHours + props.liveHours;
-  const progress = Math.min(100, (displayedTotal / weeklyGoal) * 100);
-  return (
-    <main className="min-h-screen bg-[#f4f5f7] text-[#111113]">
-      <header className="border-b border-black/5 bg-white">
-        <div className="mx-auto flex h-[76px] max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-14">
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-xl bg-[#ec1c24] font-black italic text-white">4</span>
-            <div><p className="font-black italic leading-tight">Drive4Pro4TV</p><p className="text-xs text-zinc-400">Employee workspace</p></div>
-          </div>
-          <button onClick={props.onExit} className="flex items-center gap-2 rounded-full border border-black/10 px-4 py-2 text-sm font-bold hover:bg-zinc-50">
-            <LogOut className="size-4" /> <span className="hidden sm:inline">Sign out</span>
-          </button>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 sm:py-12 lg:px-14">
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-          <div><p className="text-sm font-semibold text-zinc-500">Friday, September 25</p><h1 className="mt-1 text-4xl font-black tracking-tight sm:text-5xl">Good morning, Jasmine.</h1></div>
-          <div className="flex items-center gap-2 text-sm font-bold text-zinc-500"><CalendarDays className="size-4 text-[#ec1c24]" /> Week of Sep 21–27</div>
-        </div>
-
-        <div className="mt-9 grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
-          <section className="relative overflow-hidden rounded-[2rem] bg-[#111113] p-7 text-white shadow-[0_22px_60px_rgba(0,0,0,.14)] sm:p-9">
-            <div className="absolute -right-20 -top-24 size-80 rounded-full bg-[#ec1c24]/25 blur-3xl" />
-            <div className="relative flex h-full min-h-[290px] flex-col justify-between">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-white/45">Current status</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className={`size-2.5 rounded-full ${props.clockedInAt ? "animate-pulse bg-emerald-400" : "bg-white/25"}`} />
-                    <p className="text-xl font-bold">{props.clockedInAt ? "Clocked in" : "Not clocked in"}</p>
-                  </div>
-                </div>
-                <Clock3 className="size-8 text-white/35" />
-              </div>
-              <div className="mt-10">
-                <p className="font-mono text-[clamp(3rem,8vw,6.2rem)] font-bold leading-none tracking-[-0.06em]">
-                  {props.clockedInAt ? formatDuration(props.liveHours) : props.now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                </p>
-                <p className="mt-3 text-white/45">{props.clockedInAt && `Started at ${props.clockedInAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`}</p>
-              </div>
-              <Button onClick={props.clockedInAt ? props.onClockOut : props.onClockIn} className={`mt-8 h-14 w-full rounded-2xl text-base font-black sm:w-52 ${props.clockedInAt ? "bg-white text-[#111113] hover:bg-zinc-100" : "bg-[#ec1c24] text-white hover:bg-[#c81118]"}`}>
-                {props.clockedInAt ? "Clock out" : "Clock in"} <ArrowRight className="ml-1 size-5" />
-              </Button>
-            </div>
-          </section>
-
-          <section className="rounded-[2rem] border border-black/5 bg-white p-7 sm:p-9">
-            <div className="flex items-center justify-between">
-              <div><p className="text-sm font-semibold text-zinc-500">Weekly total</p><p className="mt-1 text-5xl font-black tracking-tight">{displayedTotal.toFixed(1)}<span className="ml-1 text-xl text-zinc-400">hrs</span></p></div>
-              <span className="grid size-12 place-items-center rounded-2xl bg-[#fff0f0] text-[#ec1c24]"><Sparkles className="size-6" /></span>
-            </div>
-            <div className="mt-10">
-              <div className="mb-3 flex items-center justify-between text-sm"><span className="font-bold">Toward 40 hours</span><span className="text-zinc-400">{Math.round(progress)}%</span></div>
-              <div className="h-3 overflow-hidden rounded-full bg-zinc-100"><div className="h-full rounded-full bg-[#ec1c24] transition-all duration-500" style={{ width: `${progress}%` }} /></div>
-              <div className="mt-8 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-zinc-50 p-4"><p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Days worked</p><p className="mt-1 text-2xl font-black">{props.shifts.length}</p></div>
-                <div className="rounded-2xl bg-zinc-50 p-4"><p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Remaining</p><p className="mt-1 text-2xl font-black">{Math.max(0, weeklyGoal - displayedTotal).toFixed(1)}h</p></div>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <section className="mt-5 overflow-hidden rounded-[2rem] border border-black/5 bg-white">
-          <div className="flex items-center justify-between border-b border-black/5 px-6 py-5 sm:px-8">
-            <div><h2 className="text-xl font-black">This week’s timesheet</h2><p className="mt-1 text-sm text-zinc-400">Hours calculate automatically after each clock-out.</p></div>
-            <span className="hidden items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 sm:flex"><Check className="size-3.5" /> Up to date</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[650px] text-left">
-              <thead><tr className="border-b border-black/5 text-xs uppercase tracking-wider text-zinc-400"><th className="px-6 py-4 font-semibold sm:px-8">Day</th><th className="px-6 py-4 font-semibold">Clock in</th><th className="px-6 py-4 font-semibold">Clock out</th><th className="px-6 py-4 text-right font-semibold sm:px-8">Total</th></tr></thead>
-              <tbody>
-                {props.shifts.map((shift, index) => (
-                  <tr key={`${shift.date}-${index}`} className="border-b border-black/5 last:border-0">
-                    <td className="px-6 py-4 sm:px-8"><span className="font-bold">{shift.day}</span><span className="ml-3 text-sm text-zinc-400">{shift.date}</span></td>
-                    <td className="px-6 py-4 text-zinc-600">{shift.inTime}</td>
-                    <td className="px-6 py-4 text-zinc-600">{shift.outTime}</td>
-                    <td className="px-6 py-4 text-right font-black sm:px-8">{shift.hours.toFixed(2)}h</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </div>
-    </main>
-  );
-}
-
-function formatDuration(hours: number) {
-  const totalSeconds = Math.floor(hours * 3600);
-  const hrs = Math.floor(totalSeconds / 3600);
-  const mins = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
-  return [hrs, mins, secs].map((value) => value.toString().padStart(2, "0")).join(":");
 }
