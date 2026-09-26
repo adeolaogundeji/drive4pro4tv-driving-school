@@ -1,5 +1,5 @@
 import { getD1 } from "@/db";
-import { createSession, hashPassword, secureEqual } from "@/lib/employee-auth";
+import { createSession, verifyPassword } from "@/lib/employee-auth";
 
 type EmployeeRow = { id: string; fullName: string; email: string; passwordHash: string; passwordSalt: string };
 
@@ -13,8 +13,8 @@ export async function POST(request: Request) {
       FROM employees WHERE email = ?
     `).bind(email).first<EmployeeRow>();
     if (!employee) return Response.json({ error: "Email or password is incorrect." }, { status: 401 });
-    const candidate = await hashPassword(password, employee.passwordSalt);
-    if (!secureEqual(candidate, employee.passwordHash)) return Response.json({ error: "Email or password is incorrect." }, { status: 401 });
+    const passwordMatches = await verifyPassword(password, employee.passwordSalt, employee.passwordHash);
+    if (!passwordMatches) return Response.json({ error: "Email or password is incorrect." }, { status: 401 });
     const session = await createSession(employee.id, request);
     return Response.json({ employee: { id: employee.id, fullName: employee.fullName, email: employee.email } }, { headers: { "Set-Cookie": session.cookie } });
   } catch (error) {

@@ -3,6 +3,8 @@ import { getD1 } from "@/db";
 
 const SESSION_COOKIE = "drive4pro_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const PASSWORD_HASH_ITERATIONS = 100_000;
+const PASSWORD_HASH_VERSION = "pbkdf2-sha256";
 
 export type EmployeeSession = {
   id: string;
@@ -25,7 +27,7 @@ export function createSalt() {
   return bytesToBase64(crypto.getRandomValues(new Uint8Array(16)));
 }
 
-export async function hashPassword(password: string, salt: string) {
+async function derivePasswordHash(password: string, salt: string, iterations: number) {
   const material = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -34,11 +36,35 @@ export async function hashPassword(password: string, salt: string) {
     ["deriveBits"],
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations: 210_000 },
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: new TextEncoder().encode(salt),
+      iterations,
+    },
     material,
     256,
   );
   return bytesToBase64(new Uint8Array(bits));
+}
+
+export async function hashPassword(password: string, salt: string) {
+  const digest = await derivePasswordHash(password, salt, PASSWORD_HASH_ITERATIONS);
+  return `${PASSWORD_HASH_VERSION}$${PASSWORD_HASH_ITERATIONS}$${digest}`;
+}
+
+export async function verifyPassword(password: string, salt: string, storedHash: string) {
+  const [version, iterationsText, expectedDigest] = storedHash.split("$");
+  const iterations = Number(iterationsText);
+  if (
+    version !== PASSWORD_HASH_VERSION ||
+    !expectedDigest ||
+    !Number.isInteger(iterations) ||
+    iterations < 1 ||
+    iterations > 100_000
+  ) return false;
+  const candidateDigest = await derivePasswordHash(password, salt, iterations);
+  return secureEqual(candidateDigest, expectedDigest);
 }
 
 export function secureEqual(left: string, right: string) {
