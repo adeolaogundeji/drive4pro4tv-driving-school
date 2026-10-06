@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Drive4Pro4TV | Excellence in Perfection",
+  title: "Drive4Pro4TV | Fontaine Driving School Learning Hub",
   description:
-    "Professional driver training built around calm instruction, practical experience, and lasting confidence.",
+    "Driving video learning resources for Fontaine Driving School students and families.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
