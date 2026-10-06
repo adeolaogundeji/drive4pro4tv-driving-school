@@ -10,6 +10,14 @@ type Employee = { id: string; fullName: string; email: string };
 type Shift = { id: string; clockIn: number; clockOut: number | null };
 type TimesheetResponse = { employee: Employee; shifts: Shift[]; weekStart: number; error?: string };
 
+async function fetchTimesheet() {
+  const response = await fetch("/api/shifts", { credentials: "same-origin", cache: "no-store" });
+  if (response.status === 401) return null;
+  const data = await response.json() as TimesheetResponse;
+  if (!response.ok) throw new Error(data.error || "Timesheet could not be loaded.");
+  return data;
+}
+
 type WebMcpContext = {
   registerTool: (tool: { name: string; title: string; description: string; inputSchema: Record<string, unknown>; annotations: { readOnlyHint: boolean; untrustedContentHint: boolean }; execute: () => unknown }, options: { signal: AbortSignal }) => void | Promise<void>;
 };
@@ -23,23 +31,31 @@ export function EmployeePortal({ onExit }: { onExit: () => void }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
 
   const loadTimesheet = useCallback(async () => {
-    const response = await fetch("/api/shifts", { credentials: "same-origin", cache: "no-store" });
-    if (response.status === 401) { setEmployee(null); setShifts([]); return false; }
-    const data = await response.json() as TimesheetResponse;
-    if (!response.ok) throw new Error(data.error || "Timesheet could not be loaded.");
+    const data = await fetchTimesheet();
+    if (!data) { setEmployee(null); setShifts([]); return false; }
     setEmployee(data.employee); setShifts(data.shifts); setWeekStart(data.weekStart); return true;
   }, []);
 
   useEffect(() => {
-    void loadTimesheet().catch((reason) => setError(reason instanceof Error ? reason.message : "Timesheet could not be loaded.")).finally(() => setLoading(false));
-  }, [loadTimesheet]);
+    let cancelled = false;
+    void fetchTimesheet()
+      .then((data) => {
+        if (cancelled) return;
+        if (!data) { setEmployee(null); setShifts([]); return; }
+        setEmployee(data.employee); setShifts(data.shifts); setWeekStart(data.weekStart);
+      })
+      .catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Timesheet could not be loaded."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setNow(Date.now()));
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    return () => { window.cancelAnimationFrame(frame); window.clearInterval(timer); };
   }, []);
 
   const activeShift = shifts.find((shift) => shift.clockOut === null) ?? null;

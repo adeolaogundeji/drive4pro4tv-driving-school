@@ -4,7 +4,13 @@ Public website and employee timekeeping portal for Drive4Pro4TV Driving School.
 
 ## Live website
 
-[drive4pro4tv-driving-school.ogundejiadeola0.chatgpt.site](https://drive4pro4tv-driving-school.ogundejiadeola0.chatgpt.site)
+[drive4pro4tv.com](https://drive4pro4tv.com)
+
+The application is deployed as a Vinext/Vite Cloudflare Worker through OpenAI
+Sites. The Sites project owns the production D1 binding, runtime secrets, MCP
+endpoint, and weekly report schedule. `drive4pro4tv.com` and
+`www.drive4pro4tv.com` are custom hostnames on that same deployment so employee
+accounts, bookings, shifts, and report history remain in one database.
 
 ## Features
 
@@ -40,7 +46,9 @@ Bookings are written to the production D1 `bookings` table before email delivery
 - `EMAIL_FROM`: verified Resend sender, or `Drive4Pro4TV Website <onboarding@resend.dev>` while testing with the Resend account owner.
 - `RESEND_API_KEY`: secret Resend API key.
 
-The public GitHub Pages site sends booking requests to the hosted `/api/bookings` endpoint. CORS is limited to `https://adeolaogundeji.github.io` plus local preview origins.
+The production site submits booking requests to its same-origin `/api/bookings`
+endpoint. The legacy GitHub Pages frontend is also accepted by CORS during the
+DNS transition.
 
 ## Weekly employee report
 
