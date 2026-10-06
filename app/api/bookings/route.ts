@@ -1,6 +1,6 @@
 function unavailable() {
   return Response.json(
-    { error: "Booking is not available on this learning site. Please contact Fontaine Driving School directly." },
+    { error: "Please book appointments through Fountain Driving School at https://fountaindrivingschooltx.com/request-an-appointment/" },
     { status: 410 },
   );
 }

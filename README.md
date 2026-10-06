@@ -1,6 +1,6 @@
-# Drive4Pro4TV Learning Hub
+# Drive4Pro4TV
 
-Public video-learning companion for Fontaine Driving School. The site directs students and families to the Drive4Pro4TV YouTube channel and Fontaine's online-school resources.
+Video-learning companion for Fountain Driving School, using the original red, black, and white Drive4Pro4TV design.
 
 ## Live website
 
@@ -11,11 +11,11 @@ The application is deployed as a Vinext/Vite Cloudflare Worker through OpenAI Si
 ## Public-site scope
 
 - Drive4Pro4TV YouTube learning resources
-- Common driving topics, including parking, road awareness, and confidence behind the wheel
-- Fontaine Driving School phone numbers, address, and online-school link
-- No published prices, payments, lesson booking, or enrollment flow
+- Driving topics for new and experienced drivers
+- Every appointment button navigates to https://fountaindrivingschooltx.com/request-an-appointment/
+- No published prices or local booking/payment form
 
-The `/api/bookings` endpoint returns `410 Gone` so booking requests cannot be created through this site. Fontaine Driving School handles official classes, enrollment, scheduling, and services directly.
+The legacy `/api/bookings` endpoint returns `410 Gone` so booking requests cannot be created through this site. Fountain Driving School handles official appointments on its own website.
 
 ## Local development
 
@@ -26,4 +26,4 @@ npm ci
 npm run dev
 ```
 
-The application retains its private employee timekeeping endpoints and D1 data for internal use. Production secrets are configured through the Sites hosting environment and are not stored in this repository.
+The employee portal retains email/password authentication, clock-in/out, and weekly timesheets backed by D1. Production secrets are configured through the Sites hosting environment and are not stored in this repository.
